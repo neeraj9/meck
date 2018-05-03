@@ -160,7 +160,7 @@ exec(Pid, Mod, Func, Args) ->
     try meck_proc:get_result_spec(Mod, Func, Args) of
         undefined ->
             meck_proc:invalidate(Mod),
-            raise(Pid, Mod, Func, Args, error, function_clause);
+            raise(Pid, Mod, Func, Args, error, function_clause, []);
         ResultSpec ->
             put(?CURRENT_CALL, {Mod, Func}),
             try
@@ -168,8 +168,9 @@ exec(Pid, Mod, Func, Args) ->
                 meck_proc:add_history(Mod, Pid, Func, Args, Result),
                 Result
             catch
-                Class:Reason ->
-                    handle_exception(Pid, Mod, Func, Args, Class, Reason)
+                Class:Reason:Stacktrace ->
+                    handle_exception(Pid, Mod, Func, Args, Class, Reason,
+                                     Stacktrace)
             after
                 erase(?CURRENT_CALL)
             end
@@ -180,22 +181,24 @@ exec(Pid, Mod, Func, Args) ->
 
 -spec handle_exception(CallerPid::pid(), Mod::atom(), Func::atom(),
                        Args::[any()], Class:: exit | error | throw,
-                       Reason::any()) ->
+                       Reason::any(),
+                       Stacktrace :: list()) ->
         no_return().
-handle_exception(Pid, Mod, Func, Args, Class, Reason) ->
+handle_exception(Pid, Mod, Func, Args, Class, Reason, Stacktrace) ->
     case meck_ret_spec:is_meck_exception(Reason) of
         {true, MockedClass, MockedReason} ->
-            raise(Pid, Mod, Func, Args, MockedClass, MockedReason);
+            raise(Pid, Mod, Func, Args, MockedClass, MockedReason, Stacktrace);
         _ ->
             meck_proc:invalidate(Mod),
-            raise(Pid, Mod, Func, Args, Class, Reason)
+            raise(Pid, Mod, Func, Args, Class, Reason, Stacktrace)
     end.
 
 -spec raise(CallerPid::pid(), Mod::atom(), Func::atom(), Args::[any()],
-            Class:: exit | error | throw, Reason::any()) ->
+            Class:: exit | error | throw, Reason::any(),
+            Stacktrace :: list()) ->
         no_return().
-raise(Pid, Mod, Func, Args, Class, Reason) ->
-    StackTrace = inject(Mod, Func, Args, erlang:get_stacktrace()),
+raise(Pid, Mod, Func, Args, Class, Reason, InputStacktrace) ->
+    StackTrace = inject(Mod, Func, Args, InputStacktrace),
     meck_proc:add_history_exception(Mod, Pid, Func, Args,
                                     {Class, Reason, StackTrace}),
     erlang:raise(Class, Reason, StackTrace).
