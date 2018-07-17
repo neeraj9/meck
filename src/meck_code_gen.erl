@@ -43,6 +43,14 @@
 -define(clause(Arguments, Body), {clause, ?LINE, Arguments, [], Body}).
 -define(tuple(Elements), {tuple, ?LINE, Elements}).
 
+-ifdef('FUN_STACKTRACE').
+-define(CAPTURE_STACKTRACE, ).
+-define(GET_STACKTRACE, erlang:get_stacktrace()).
+-else.
+-define(CAPTURE_STACKTRACE, :__StackTrace).
+-define(GET_STACKTRACE, __StackTrace).
+-endif.
+
 %%%============================================================================
 %%% API
 %%%============================================================================
@@ -168,9 +176,9 @@ exec(Pid, Mod, Func, Args) ->
                 meck_proc:add_history(Mod, Pid, Func, Args, Result),
                 Result
             catch
-                Class:Reason:Stacktrace ->
+                Class:Reason ?CAPTURE_STACKTRACE ->
                     handle_exception(Pid, Mod, Func, Args, Class, Reason,
-                                     Stacktrace)
+                                     ?GET_STACKTRACE)
             after
                 erase(?CURRENT_CALL)
             end

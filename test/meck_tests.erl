@@ -18,6 +18,14 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-ifdef('FUN_STACKTRACE').
+-define(CAPTURE_STACKTRACE, ).
+-define(GET_STACKTRACE, erlang:get_stacktrace()).
+-else.
+-define(CAPTURE_STACKTRACE, :__StackTrace).
+-define(GET_STACKTRACE, __StackTrace).
+-endif.
+
 -define(assertTerminated(MonitorRef, Reason, Timeout),
         (fun() ->
                 receive
@@ -207,11 +215,11 @@ stacktrace_(Mod) ->
         Mod:test(),
         throw(failed)
     catch
-        error:test_error ->
+        error:test_error ?CAPTURE_STACKTRACE ->
             ?assert(lists:any(fun({M, test, []}) when M == Mod    -> true;
                                  ({M, test, [],[]}) when M == Mod -> true;
                                  (_)                              -> false
-                              end, erlang:get_stacktrace()))
+                              end, ?GET_STACKTRACE))
     end.
 
 stacktrace_function_clause_(Mod) ->
@@ -220,8 +228,8 @@ stacktrace_function_clause_(Mod) ->
         Mod:test(error),
         throw(failed)
     catch
-        error:function_clause ->
-            Stacktrace = erlang:get_stacktrace(),
+        error:function_clause ?CAPTURE_STACKTRACE ->
+            Stacktrace = ?GET_STACKTRACE,
             ?assert(lists:any(
                 fun ({M, test, [error]}) when M == Mod     -> true;
                     ({M, test, [error], []}) when M == Mod -> true;
